@@ -17,12 +17,12 @@ npm run cadran:artifact  # dist-cadran/cadran.html, un seul fichier pour le test
 
 ## Règles du moteur
 
-- Chaque tour : pioche de 3, **une** action (poser, déplacer, retirer) ; deux au premier tour.
+- Chaque tour : pioche de 4 et 3 de **Remontage** : poser une carte coûte son poids, déplacer coûte 1, retirer est gratuit.
 - Par cran : ta préparation (boucliers, parades, manipulations du temps), puis l'automate, puis ton attaque.
-- Couple maximum 6 ; Minuit au tour 6 (8 contre le boss) double les dégâts de l'automate à chaque tour.
+- Couple maximum 10 ; Minuit au tour 6 (8 contre le boss) double les dégâts de l'automate à chaque tour.
 - L'aperçu chiffré est exact : le moteur (`src/engine/`) est pur et déterministe, l'aperçu rejoue le tour sur une copie.
 
 ## Équilibrage
 
-Toutes les valeurs sont dans `src/engine/cards.ts` et `src/engine/enemies.ts`.
-`tests/bot.test.ts` fait jouer 40 runs à un bot glouton (qui ne voit qu'un tour à l'avance) : il en gagne 8 sur 40.
+Toutes les valeurs sont dans `src/engine/cards.ts` et `src/engine/enemies.ts` ; `TUNING` (enemies.ts) règle globalement PV, dégâts et boucliers des automates.
+`tests/bot.test.ts` fait jouer 40 runs à un bot glouton (qui ne voit qu'un tour à l'avance) : il en gagne 16 sur 40.

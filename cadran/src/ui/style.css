@@ -111,6 +111,9 @@ h1, h2, h3 { font-family: var(--title); font-weight: 700; line-height: 1.05; tex
 .actions { display: flex; gap: 8px; align-items: center; }
 .actions .info { flex: 1; font-size: 11px; color: var(--text2); text-align: center; line-height: 1.3; font-variant-numeric: tabular-nums; }
 .actions .info b { color: var(--ink); }
+.energy { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: 2px; }
+.energy i { width: 9px; height: 9px; border: 1.5px solid var(--brass-dark); transform: rotate(45deg); }
+.energy i.on { background: var(--brass); border-color: var(--brass); }
 .primary, .secondary { min-height: 46px; padding: 0 14px; font-family: var(--title); font-size: 18px; font-weight: 700; }
 .primary { background: var(--ink); color: var(--parchment); border: 2px solid var(--brass); }
 .secondary { background: var(--aged-light); border: 1px solid var(--brass-dark); color: var(--ink); }

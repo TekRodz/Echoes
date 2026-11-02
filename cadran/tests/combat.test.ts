@@ -90,19 +90,19 @@ describe('cartes', () => {
     s.player.maxHp = 999;
     for (let i = 0; i < 5; i++) resolveTour(s);
     expect(s.tour).toBe(6);
+    const base = intentsFor(s, 6).find((i) => i.kind === 'attack')!.value;
     const log = resolveTour(s);
     const hurt = log.steps.flatMap((st) => st.events).find((e) => e.t === 'hurt');
-    expect(hurt && hurt.t === 'hurt' && hurt.v).toBe(2 * (4 + Math.floor(5 / 2)));
+    expect(hurt && hurt.t === 'hurt' && hurt.v).toBe(2 * base);
   });
 
   it('le Grand Carillon fait tourner le cadran quand il change de phase', () => {
     const s = bareCombat('carillon', { 4: 'frappe' }, [], 999);
-    s.enemy.hp = 62; // juste au-dessus des 2/3 de 90
-    s.dial[0] = card('midi');
+    s.enemy.hp = Math.floor((s.enemy.maxHp * 2) / 3) + 4; // juste au-dessus des 2/3
     s.dial[11] = card('frappe');
     resolveTour(s);
     expect(s.enemy.phase).toBe(1);
     expect(s.dial[5]?.id).toBe('frappe');
-    expect(s.dial[0]?.id).toBe('frappe');
+    expect(s.dial[0]?.id).toBe('frappe'); // le cran 12 passe au cran 1
   });
 });

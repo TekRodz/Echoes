@@ -33,7 +33,7 @@ function playRun(seed: number): { won: boolean; heure: number } {
       const s = run.combat!;
       let guard = 0;
       while (!s.outcome && guard++ < 30) {
-        while (s.actionsLeft > 0) {
+        while (s.energy > 0) {
           const a = bestAction(s);
           if (!a) break;
           a();

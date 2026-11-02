@@ -1,12 +1,15 @@
 // Moteur de combat de Cadran. Pur et déterministe : mêmes graine et mêmes actions => mêmes résultats.
 import { coupleOf, def, ENGRENAGE_IDS, vOf, wOf } from './cards';
-import { ENEMIES, phaseFor } from './enemies';
+import { ENEMIES, phaseFor, tunedHp, tunedIntents } from './enemies';
 import { next, shuffle } from './rng';
 import type { CardInst, CombatState, CranStep, EnemyId, Intent, RelicId, StepEvent, TourLog } from './types';
 
 export const CRANS = 12;
-export const HAND_SIZE = 3;
-export const BASE_COUPLE = 6;
+export const HAND_SIZE = 4;
+export const BASE_COUPLE = 10;
+/** Remontage par tour : poser coûte le poids de la carte, déplacer coûte 1, retirer est gratuit. */
+export const ENERGY = 3;
+export const MOVE_COST = 1;
 export const MINUIT = 6;
 
 export interface CombatOptions {
@@ -20,8 +23,7 @@ export interface CombatOptions {
 }
 
 export function createCombat(o: CombatOptions): CombatState {
-  const e = ENEMIES[o.enemy];
-  const maxHp = Math.round(e.hp * (o.hpScale ?? 1));
+  const maxHp = Math.round(tunedHp(o.enemy) * (o.hpScale ?? 1));
   const s: CombatState = {
     seed: o.seed,
     rng: o.seed | 0,
@@ -33,8 +35,9 @@ export function createCombat(o: CombatOptions): CombatState {
     player: { hp: o.hp, maxHp: o.maxHp, block: 0 },
     enemy: { id: o.enemy, hp: maxHp, maxHp, block: 0, phase: 0, rolls: [] },
     relics: [...o.relics],
-    coupleMax: BASE_COUPLE + (o.relics.includes('spiral') ? 2 : 0),
-    actionsLeft: 0,
+    coupleMax: BASE_COUPLE + (o.relics.includes('spiral') ? 3 : 0),
+    energy: 0,
+    energyMax: 0,
     extraDraw: 0,
     lastBestHit: 0,
     rotatePending: 0,
@@ -76,8 +79,8 @@ function startTour(s: CombatState): void {
   s.hand = [];
   drawCards(s, HAND_SIZE + s.extraDraw);
   s.extraDraw = 0;
-  // Premier tour : 2 actions pour amorcer la machine (3 avec le Remontoir).
-  s.actionsLeft = 1 + (has(s, 'sablier') ? 1 : 0) + (s.tour === 1 ? 1 : 0) + (s.tour === 1 && has(s, 'remontoir') ? 1 : 0);
+  s.energy = ENERGY + (has(s, 'sablier') ? 1 : 0) + (s.tour === 1 && has(s, 'remontoir') ? 2 : 0);
+  s.energyMax = s.energy;
   s.player.block = has(s, 'contrepoids') ? 4 : 0;
   s.enemy.block = 0;
   if (s.tour > 1 && has(s, 'sablier')) {
@@ -90,30 +93,31 @@ export const coupleUsed = (s: CombatState): number => s.dial.reduce((a, c) => a 
 
 export function canPlace(s: CombatState, handIdx: number, cran: number): boolean {
   const c = s.hand[handIdx];
-  return !!c && !s.outcome && s.actionsLeft > 0 && !s.dial[cran] && coupleUsed(s) + coupleOf(c) <= s.coupleMax;
+  return !!c && !s.outcome && s.energy >= coupleOf(c) && !s.dial[cran] && coupleUsed(s) + coupleOf(c) <= s.coupleMax;
 }
 
 export function place(s: CombatState, handIdx: number, cran: number): boolean {
   if (!canPlace(s, handIdx, cran)) return false;
-  s.dial[cran] = s.hand.splice(handIdx, 1)[0]!;
-  s.actionsLeft--;
+  const c = s.hand.splice(handIdx, 1)[0]!;
+  s.dial[cran] = c;
+  s.energy -= coupleOf(c);
   return true;
 }
 
 export function canMove(s: CombatState, from: number, to: number): boolean {
-  return !s.outcome && s.actionsLeft > 0 && !!s.dial[from] && !s.dial[to] && from !== to;
+  return !s.outcome && s.energy >= MOVE_COST && !!s.dial[from] && !s.dial[to] && from !== to;
 }
 
 export function move(s: CombatState, from: number, to: number): boolean {
   if (!canMove(s, from, to)) return false;
   s.dial[to] = s.dial[from]!;
   s.dial[from] = null;
-  s.actionsLeft--;
+  s.energy -= MOVE_COST;
   return true;
 }
 
 export function canRemove(s: CombatState, cran: number): boolean {
-  return !s.outcome && s.actionsLeft > 0 && !!s.dial[cran];
+  return !s.outcome && !!s.dial[cran];
 }
 
 export function remove(s: CombatState, cran: number): boolean {
@@ -123,12 +127,11 @@ export function remove(s: CombatState, cran: number): boolean {
   c.tension = 0;
   c.turns = 0;
   s.discard.push(c);
-  s.actionsLeft--;
   return true;
 }
 
 export function intentsFor(s: CombatState, tour: number): Intent[] {
-  return ENEMIES[s.enemy.id].intents(tour, s.enemy.phase, s.enemy.rolls).sort((a, b) => a.cran - b.cran);
+  return tunedIntents(s.enemy.id, tour, s.enemy.phase, s.enemy.rolls).sort((a, b) => a.cran - b.cran);
 }
 
 export const minuitTour = (s: CombatState): number => (ENEMIES[s.enemy.id].minuit ?? MINUIT) + (has(s, 'fusee') ? 1 : 0);

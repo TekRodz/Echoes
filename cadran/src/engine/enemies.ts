@@ -127,6 +127,21 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
   },
 };
 
+/**
+ * Réglage global de la difficulté, appliqué à tous les automates.
+ * hp : multiplie les PV ; dmg : multiplie les attaques, coups chargés et battements ; ward : boucliers et soins.
+ */
+export const TUNING = { hp: 1.55, dmg: 1.4, ward: 1.3 };
+
+export function tunedIntents(id: EnemyId, tour: number, phase: number, rolls: number[]): Intent[] {
+  return ENEMIES[id].intents(tour, phase, rolls).map((it) => {
+    const k = it.kind === 'attack' || it.kind === 'bigAttack' || it.kind === 'gap' || it.kind === 'copy' ? TUNING.dmg : it.kind === 'block' || it.kind === 'heal' ? TUNING.ward : 1;
+    return { ...it, value: Math.round(it.value * k) };
+  });
+}
+
+export const tunedHp = (id: EnemyId): number => Math.round(ENEMIES[id].hp * TUNING.hp);
+
 export const NORMAL_POOL: EnemyId[] = ['coucou', 'metronome', 'sonnerie'];
 export const ELITE_POOL: EnemyId[] = ['remonteur', 'miroir'];
 

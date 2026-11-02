@@ -2,8 +2,8 @@
 import './style.css';
 import { Sound } from '../../../src/audio';
 import { ARCHETYPE_NAME, CARDS, coupleOf, def, textOf } from '../engine/cards';
-import { canMove, canPlace, canRemove, cardBadge, coupleUsed, intentsFor, minuitMult, minuitTour, move, place, previewTour, remove, resolveTour } from '../engine/combat';
-import { ENEMIES } from '../engine/enemies';
+import { canMove, canPlace, canRemove, cardBadge, coupleUsed, intentsFor, minuitMult, minuitTour, move, MOVE_COST, place, previewTour, remove, resolveTour } from '../engine/combat';
+import { ENEMIES, tunedHp } from '../engine/enemies';
 import { RELICS } from '../engine/relics';
 import { buyCard, buyRelic, chooseNode, COST, finishCombat, HEURES, leaveAtelier, newRun, removeCard, repair, takeReward, temperCard, type RunState } from '../engine/run';
 import type { CardInst, CombatState, TourLog } from '../engine/types';
@@ -76,7 +76,7 @@ function cardHtml(c: CardInst | string, o: { selected?: boolean; cant?: boolean;
   const cls = ['card', o.selected ? 'selected' : '', o.cant ? 'cant' : '', o.ghost ? 'ghost' : ''].join(' ');
   const attrs = o.act ? `data-act="${o.act}" data-arg="${o.arg ?? ''}"` : 'disabled';
   return `<button type="button" class="${cls}" ${attrs} aria-label="${esc(d.name)} : ${esc(textOf(inst))}">
-    <span class="top"><span class="nm${inst.tempered ? ' tempered' : ''}">${d.name}</span><span class="pips" title="Couple ${coupleOf(inst)}">${pips}</span></span>
+    <span class="top"><span class="nm${inst.tempered ? ' tempered' : ''}">${d.name}</span><span class="pips" title="Coût et poids : ${coupleOf(inst)}">${pips}</span></span>
     <span class="tx">${textOf(inst)}</span>
     <span class="arch">${glyph(d.glyph, 12, '#5a4a36')}${ARCHETYPE_NAME[d.archetype]}</span>
   </button>`;
@@ -100,10 +100,10 @@ function relicsHtml(r: RunState): string {
 
 const RULES = `
   <p><b>Le cadran.</b> 12 crans. L’anneau extérieur montre ce que l’automate fera à chaque cran ; l’anneau intérieur porte tes cartes.</p>
-  <p><b>Un tour.</b> Tu pioches 3 cartes et tu fais <b>une</b> action : poser une carte, déplacer une carte posée, ou en retirer une. (Deux au premier tour.)</p>
+  <p><b>Un tour.</b> Tu pioches 4 cartes et tu as <b>3 de Remontage</b>. Poser une carte coûte son poids (les losanges), déplacer une carte posée coûte 1, la retirer est gratuit.</p>
   <p><b>Le cadran tourne.</b> À chaque cran : ta défense, puis l’automate, puis ton attaque. Les chiffres au centre du cadran sont la prévision exacte du tour.</p>
   <p><b>Le temps se rembobine.</b> Tes cartes restent posées et rejouent à chaque tour. La machine grandit d’une pièce par tour.</p>
-  <p><b>Couple.</b> Le poids total des cartes posées est limité (losanges sur chaque carte).</p>
+  <p><b>Couple.</b> Le cadran supporte au plus 10 de poids. Pour poser une grosse pièce, retire-en une vieille.</p>
   <p><b>Minuit.</b> Au 6e tour, l’automate double ses dégâts, puis encore à chaque tour. Ne traîne pas.</p>`;
 
 // ——— Écrans ———
@@ -129,7 +129,7 @@ function mapScreen(r: RunState): string {
   const nodes = r.nodes
     .map((n, i) => {
       const e = ENEMIES[n.enemy];
-      const hp = n.kind === 'boss' ? e.hp : Math.round(e.hp * (1 + 0.1 * (r.heure - 1)));
+      const hp = n.kind === 'boss' ? tunedHp(n.enemy) : Math.round(tunedHp(n.enemy) * (1 + 0.1 * (r.heure - 1)));
       const tag = n.kind === 'boss' ? '<span class="tag boss">Boss</span>' : n.kind === 'elite' ? '<span class="tag elite">Élite · rouage garanti</span>' : '<span class="tag">Automate</span>';
       return `<button type="button" class="node ${n.kind}" data-act="node" data-arg="${i}">
         ${sprite(n.enemy, 52)}
@@ -232,20 +232,27 @@ function combatScreen(r: RunState): string {
   else if (sel?.kind === 'hand') {
     const c = s.hand[sel.i]!;
     const fits = coupleUsed(s) + coupleOf(c) <= s.coupleMax;
-    detail = `<span class="grow"><strong>${def(c).name}</strong> · ${fits ? 'touche un cran libre pour la poser.' : '<span class="danger">Couple insuffisant : retire d’abord une carte du cadran.</span>'}</span>`;
+    const afford = s.energy >= coupleOf(c);
+    const msg = !afford
+      ? `<span class="danger">Il faut ${coupleOf(c)} de Remontage, il t’en reste ${s.energy}.</span>`
+      : !fits
+        ? '<span class="danger">Couple du cadran dépassé : retire d’abord une carte (gratuit).</span>'
+        : `coûte ${coupleOf(c)} de Remontage. Touche un cran libre pour la poser.`;
+    detail = `<span class="grow"><strong>${def(c).name}</strong> · ${msg}</span>`;
   } else if (sel?.kind === 'slot') {
     const c = s.dial[sel.c]!;
-    detail = `<span class="grow"><strong>${def(c).name}${c.tempered ? '+' : ''}</strong> · cran ${sel.c + 1} · ${textOf(c)}${c.id === 'ressort' ? ` Tension : ${c.tension}.` : ''} ${s.actionsLeft ? 'Touche un cran libre pour la déplacer.' : ''}</span>${canRemove(s, sel.c) ? '<button type="button" class="toggle" data-act="remove">Retirer</button>' : ''}`;
+    detail = `<span class="grow"><strong>${def(c).name}${c.tempered ? '+' : ''}</strong> · cran ${sel.c + 1} · ${textOf(c)}${c.id === 'ressort' ? ` Tension : ${c.tension}.` : ''} ${s.energy >= MOVE_COST ? 'Touche un cran libre pour la déplacer (1 de Remontage).' : ''}</span>${canRemove(s, sel.c) ? '<button type="button" class="toggle" data-act="remove">Retirer</button>' : ''}`;
   } else {
     const firstFight = r.heure === 1 && s.tour <= 2;
     const tip = firstFight
       ? 'Les pastilles rouges sont ses coups. Une Parade posée sur le même cran l’annule et la renvoie.'
-      : 'Choisis une carte de ta main, puis un cran. Touche une carte posée pour la déplacer ou la retirer.';
-    detail = `<span class="grow">${s.actionsLeft > 0 ? tip : 'Plus d’action pour ce tour : lance le cadran.'}</span>`;
+      : 'Pose autant de cartes que ton Remontage le permet. Touche une carte posée pour la déplacer ou la retirer.';
+    const canStill = s.hand.some((c) => s.energy >= coupleOf(c)) || s.energy >= MOVE_COST;
+    detail = `<span class="grow">${canStill ? tip : 'Remontage épuisé : lance le cadran.'}</span>`;
   }
 
   const hand = (anim ? anim.pre.hand : s.hand)
-    .map((c, i) => cardHtml(c, { selected: sel?.kind === 'hand' && sel.i === i, cant: !anim && s.actionsLeft > 0 && coupleUsed(s) + coupleOf(c) > s.coupleMax, act: anim ? undefined : 'hand', arg: i }))
+    .map((c, i) => cardHtml(c, { selected: sel?.kind === 'hand' && sel.i === i, cant: !anim && (s.energy < coupleOf(c) || coupleUsed(s) + coupleOf(c) > s.coupleMax), act: anim ? undefined : 'hand', arg: i }))
     .join('');
   const pad = Array.from({ length: Math.max(0, 3 - (anim ? anim.pre.hand.length : s.hand.length)) }, () => cardHtml('frappe', { ghost: true })).join('');
 
@@ -264,7 +271,7 @@ function combatScreen(r: RunState): string {
   <div class="hand">${hand}${pad}</div>
   <div class="actions">
     <button type="button" class="secondary" data-act="undo" ${anim || !undo.length ? 'disabled' : ''}>Annuler</button>
-    <span class="info">Couple <b>${coupleUsed(view)}/${view.coupleMax}</b> · ${view.actionsLeft} action${view.actionsLeft > 1 ? 's' : ''}${player.block ? ` · ${glyph('block', 11, '#1f1a14')} ${player.block}` : ''}</span>
+    <span class="info"><span class="energy" aria-label="Remontage ${view.energy} sur ${view.energyMax}">${Array.from({ length: view.energyMax }, (_, i) => `<i class="${i < view.energy ? 'on' : ''}"></i>`).join('')}</span> Remontage <b>${view.energy}</b><br>Couple <b>${coupleUsed(view)}/${view.coupleMax}</b>${player.block ? ` · ${glyph('block', 11, '#1f1a14')} ${player.block}` : ''}</span>
     <button type="button" class="primary" data-act="launch" ${anim ? 'disabled' : ''}>Lancer</button>
   </div>`;
 }

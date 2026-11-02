@@ -43,7 +43,9 @@ export interface CombatState {
   enemy: Fighter & { id: EnemyId; phase: number; rolls: number[] };
   relics: RelicId[];
   coupleMax: number;
-  actionsLeft: number;
+  /** Remontage restant pour ce tour (énergie). */
+  energy: number;
+  energyMax: number;
   extraDraw: number;
   /** Plus gros coup d'une seule carte au tour précédent (Miroir). */
   lastBestHit: number;
