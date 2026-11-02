@@ -64,11 +64,12 @@ describe('cartes', () => {
     const s = bareCombat('metronome', { 0: 'ressort' });
     resolveTour(s);
     resolveTour(s);
-    expect(s.dial[0]!.tension).toBe(4);
-    s.dial[1] = card('declic');
+    // Le cadran a tourné deux fois : le Ressort est passé du cran 1 au cran 3.
+    expect(s.dial[2]!.tension).toBe(4);
+    s.dial[3] = card('declic');
     const log = resolveTour(s); // +2 au début du tour => 6 de Tension => 18 dégâts
-    expect(log.steps[1]!.events.some((e) => e.t === 'hit' && e.v === 18)).toBe(true);
-    expect(s.dial[0]!.tension).toBe(0);
+    expect(log.steps[3]!.events.some((e) => e.t === 'hit' && e.v === 18)).toBe(true);
+    expect(s.dial[3]!.tension).toBe(0); // après rotation, le Ressort est au cran 4
   });
 
   it('Élan et Doublé modifient la carte du cran suivant', () => {
@@ -96,13 +97,32 @@ describe('cartes', () => {
     expect(hurt && hurt.t === 'hurt' && hurt.v).toBe(2 * base);
   });
 
+  it('le cadran tourne d’un cran à chaque rembobinage, sauf les cartes fixes', () => {
+    const s = bareCombat('metronome', { 0: 'frappe', 11: 'bouclier', 5: 'midi' }, [], 999);
+    resolveTour(s);
+    expect(s.dial[1]?.id).toBe('frappe');
+    expect(s.dial[0]?.id).toBe('bouclier'); // le cran 12 passe au cran 1
+    expect(s.dial[5]?.id).toBe('midi'); // fixe
+  });
+
+  it('si l’automate te brise sur le même cran que ton coup fatal, tu perds', () => {
+    const s = bareCombat('coucou', {}, [], 1);
+    const atk = intentsFor(s, 1)[0]!;
+    s.enemy.hp = 1;
+    s.dial[atk.cran] = card('frappe');
+    const log = resolveTour(s);
+    expect(log.outcome).toBe('lose');
+    expect(s.enemy.hp).toBe(1);
+  });
+
   it('le Grand Carillon fait tourner le cadran quand il change de phase', () => {
     const s = bareCombat('carillon', { 4: 'frappe' }, [], 999);
     s.enemy.hp = Math.floor((s.enemy.maxHp * 2) / 3) + 4; // juste au-dessus des 2/3
     s.dial[11] = card('frappe');
     resolveTour(s);
     expect(s.enemy.phase).toBe(1);
-    expect(s.dial[5]?.id).toBe('frappe');
-    expect(s.dial[0]?.id).toBe('frappe'); // le cran 12 passe au cran 1
+    // 1 cran de rotation normale + un quart de tour (3 crans) du Carillon.
+    expect(s.dial[8]?.id).toBe('frappe');
+    expect(s.dial[3]?.id).toBe('frappe'); // le cran 12 passe au cran 4
   });
 });

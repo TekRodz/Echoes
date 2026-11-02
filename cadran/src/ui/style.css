@@ -78,6 +78,10 @@ h1, h2, h3 { font-family: var(--title); font-weight: 700; line-height: 1.05; tex
 }
 .float.hurt { color: var(--sanguine); }
 .float.info { font-size: 14px; font-style: italic; color: var(--text2); }
+.dial-svg .spin { transform-origin: 190px 190px; transform-box: view-box; animation: spin-in 0.7s cubic-bezier(0.2, 0.8, 0.3, 1); }
+@keyframes spin-in { from { transform: rotate(var(--from)); } to { transform: rotate(0deg); } }
+.float.summary { background: var(--parchment); border: 1px solid var(--ink); padding: 6px 10px; text-shadow: none; font-size: 17px; line-height: 1.25; text-align: center; white-space: nowrap; animation-duration: 2.2s; color: var(--ink); }
+.float.summary small { display: block; font-family: var(--body); font-weight: 400; font-style: italic; font-size: 12px; color: var(--text2); }
 @keyframes rise { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -26px; } }
 .shake { animation: shake 0.25s; }
 @keyframes shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
@@ -92,7 +96,12 @@ h1, h2, h3 { font-family: var(--title); font-weight: 700; line-height: 1.05; tex
 .detail .grow { flex: 1; min-width: 0; }
 
 /* Cartes */
-.hand { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.hand { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.hand .card { min-height: 98px; padding: 5px 5px 6px; }
+.hand .card.selected { padding: 4px 4px 5px; }
+.hand .card .nm { font-size: 14px; overflow-wrap: anywhere; }
+.hand .card .tx { font-size: 10.5px; line-height: 1.25; }
+.hand .card .arch { font-size: 8.5px; letter-spacing: 0.08em; }
 .card {
   position: relative; text-align: left; background: var(--aged-light); border: 1px solid var(--brass-dark);
   padding: 6px 7px 7px; display: flex; flex-direction: column; gap: 3px; min-height: 104px;
@@ -166,5 +175,5 @@ h1, h2, h3 { font-family: var(--title); font-weight: 700; line-height: 1.05; tex
   .enemy .text { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .float, .shake { animation: none; }
+  .float, .shake, .dial-svg .spin { animation: none; }
 }

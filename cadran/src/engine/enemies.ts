@@ -113,7 +113,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
     hp: 90,
     tier: 'boss',
     minuit: 8,
-    text: 'Trois phases. À chaque changement de phase, il fait tourner ton cadran d’un cran.',
+    text: 'Trois phases. À chaque changement de phase, il fait faire un quart de tour de plus à ton cadran.',
     intents: (tour, phase, rolls) => {
       const s = Math.floor((tour - 1) / 2);
       if (phase === 0) return [I(2, 'attack', 5 + s), I(8, 'attack', 5 + s), ...(tour >= 3 ? [I(5, 'attack', 4 + s)] : [])];
@@ -131,7 +131,7 @@ export const ENEMIES: Record<EnemyId, EnemyDef> = {
  * Réglage global de la difficulté, appliqué à tous les automates.
  * hp : multiplie les PV ; dmg : multiplie les attaques, coups chargés et battements ; ward : boucliers et soins.
  */
-export const TUNING = { hp: 1.55, dmg: 1.4, ward: 1.3 };
+export const TUNING = { hp: 1.45, dmg: 1.3, ward: 1.3 };
 
 export function tunedIntents(id: EnemyId, tour: number, phase: number, rolls: number[]): Intent[] {
   return ENEMIES[id].intents(tour, phase, rolls).map((it) => {

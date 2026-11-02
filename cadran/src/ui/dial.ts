@@ -20,6 +20,8 @@ export interface DialView {
   badge: (c: CardInst) => string;
   hand: number;
   erased: Set<number>;
+  /** Nombre de crans dont le cadran vient de tourner (animation). */
+  spin: number;
 }
 
 const S = 380;
@@ -105,7 +107,8 @@ export function renderDial(v: DialView): string {
   parts.push(`<text x="${CX}" y="${CX - 6}" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="19" font-weight="700" fill="${C.ink}">${v.title}</text>`);
   parts.push(`<text x="${CX}" y="${CX + 14}" text-anchor="middle" font-family="Spectral, Georgia, serif" font-size="10" fill="${v.sub.startsWith('!') ? C.san : C.text2}">${v.sub.replace(/^!/, '')}</text>`);
 
-  // Emplacements de cartes.
+  // Emplacements de cartes (groupe animé quand le cadran tourne).
+  parts.push(`<g class="cards${v.spin ? ' spin' : ''}" style="--from:${-30 * v.spin}deg">`);
   for (let i = 0; i < 12; i++) {
     const [x, y] = pos(R_CARD, i);
     const c = v.dial[i];
@@ -119,6 +122,7 @@ export function renderDial(v: DialView): string {
       g += glyphAt(def(c).glyph, x, y - 6, 20, C.parch);
       const b = v.badge(c);
       if (b) g += `<text x="${f(x)}" y="${f(y + 16)}" text-anchor="middle" font-family="Spectral, Georgia, serif" font-size="10.5" font-weight="600" fill="${C.agedL}">${b}</text>`;
+      if (def(c).fixed) g += `<circle cx="${f(x)}" cy="${f(y)}" r="${SLOT / 2 - 2.5}" fill="none" stroke="${C.brass}" stroke-width="1.5" stroke-dasharray="2 2.5"/>`;
       if (c.tempered) g += `<circle cx="${f(x + 15)}" cy="${f(y - 15)}" r="5" fill="${C.brass}" stroke="${C.parch}" stroke-width="1.5"/>`;
       if (sel) g += `<circle cx="${f(x)}" cy="${f(y)}" r="${SLOT / 2 + 3}" fill="none" stroke="${C.brass}" stroke-width="3"/>`;
     } else {
@@ -127,6 +131,7 @@ export function renderDial(v: DialView): string {
     g += '</g>';
     parts.push(g);
   }
+  parts.push('</g>');
 
   // Intentions de l'automate.
   const seen = new Map<number, number>();

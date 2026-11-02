@@ -66,13 +66,34 @@ function drawCards(s: CombatState, n: number): void {
   }
 }
 
-/** Préparation d'un tour : rotation éventuelle, main défaussée, pioche, actions. */
+/** Cartes qui ne tournent pas avec le cadran. */
+export const isFixed = (c: CardInst): boolean => !!def(c).fixed;
+
+/**
+ * Le cadran tourne de n crans dans le sens des aiguilles d'une montre.
+ * Les cartes fixes restent en place ; une carte qui tomberait sur une carte fixe avance jusqu'au cran libre suivant.
+ */
+export function rotatedDial(dial: (CardInst | null)[], n: number): (CardInst | null)[] {
+  const d = Array<CardInst | null>(CRANS).fill(null);
+  dial.forEach((c, i) => {
+    if (c && isFixed(c)) d[i] = c;
+  });
+  dial.forEach((c, i) => {
+    if (!c || isFixed(c)) return;
+    let t = (((i + n) % CRANS) + CRANS) % CRANS;
+    for (let k = 0; k < CRANS && d[t]; k++) t = (t + 1) % CRANS;
+    d[t] = c;
+  });
+  return d;
+}
+
+/** Rotation appliquée à chaque rembobinage : 1 cran, plus l'éventuel quart de tour du Grand Carillon. */
+export const ROTATION = 1;
+
+/** Préparation d'un tour : rotation du cadran, main défaussée, pioche, Remontage. */
 function startTour(s: CombatState): void {
-  if (s.rotatePending) {
-    const n = s.rotatePending;
-    const d = Array<CardInst | null>(CRANS).fill(null);
-    s.dial.forEach((c, i) => (d[(i + n) % CRANS] = c));
-    s.dial = d;
+  if (s.tour > 1) {
+    s.dial = rotatedDial(s.dial, ROTATION + s.rotatePending);
     s.rotatePending = 0;
   }
   s.discard.push(...s.hand);
@@ -401,8 +422,14 @@ export function resolveTour(s: CombatState): TourLog {
       }
     });
 
+    // Si l'automate t'a brisée, ta carte n'a pas le temps d'agir.
+    if (s.player.hp <= 0) {
+      s.player.hp = 0;
+      s.outcome = 'lose';
+    }
+
     // C. Action de ta carte (si elle n'a pas été démontée).
-    if (card && s.dial[c] === card) for (let k = 0; k < n; k++) act(card, c, 1);
+    if (!s.outcome && card && s.dial[c] === card) for (let k = 0; k < n; k++) act(card, c, 1);
 
     // D. Fin de cran.
     if (rust > 0 && s.enemy.hp > 0) {
@@ -411,12 +438,9 @@ export function resolveTour(s: CombatState): TourLog {
       ev.push({ t: 'rust', v: rust });
     }
 
-    if (s.enemy.hp <= 0) {
+    if (!s.outcome && s.enemy.hp <= 0) {
       s.enemy.hp = 0;
       s.outcome = 'win';
-    } else if (s.player.hp <= 0) {
-      s.player.hp = 0;
-      s.outcome = 'lose';
     }
     steps.push({
       cran: c,
@@ -435,7 +459,7 @@ export function resolveTour(s: CombatState): TourLog {
   if (!s.outcome) {
     const ph = phaseFor(s.enemy.id, s.enemy.hp, s.enemy.maxHp);
     if (ph > s.enemy.phase) {
-      s.rotatePending += ph - s.enemy.phase;
+      s.rotatePending += 3 * (ph - s.enemy.phase);
       s.enemy.phase = ph;
     }
     s.tour++;

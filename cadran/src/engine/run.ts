@@ -120,6 +120,8 @@ export function finishCombat(run: RunState): void {
   const c = run.combat;
   if (!c || !c.outcome || run.screen !== 'combat') return;
   run.hp = Math.max(0, c.player.hp);
+  // Garde-fou : une victoire à 0 d'Intégrité reste une défaite.
+  if (run.hp <= 0) c.outcome = 'lose';
   run.stats.combats++;
   run.stats.tours += c.tour;
   if (c.outcome === 'lose') {

@@ -16,6 +16,8 @@ export interface CardDef {
   /** Valeur secondaire éventuelle [normal, trempé]. */
   w?: [number, number];
   text: (v: number, w: number) => string;
+  /** Fixe : la carte ne tourne pas avec le cadran. */
+  fixed?: boolean;
 }
 
 const d = (def: CardDef): CardDef => def;
@@ -50,7 +52,7 @@ export const CARDS: Record<string, CardDef> = Object.fromEntries(
     d({ id: 'barillet', name: 'Barillet', archetype: 'ressort', rarity: 'peu commune', glyph: 'block', couple: [2, 2], v: [5, 7], w: [2, 3], text: (v, w) => `${v} de bouclier, +${w} par point de Tension.` }),
     d({ id: 'cliquet', name: 'Cliquet', archetype: 'ressort', rarity: 'commune', glyph: 'hit', couple: [1, 1], v: [4, 6], text: (v) => `${v} dégâts. +1 Tension au Ressort le plus proche.` }),
     // Rares
-    d({ id: 'midi', name: 'Coup de midi', archetype: 'rare', rarity: 'rare', glyph: 'star', couple: [3, 3], v: [25, 35], text: (v) => `${v} dégâts, seulement au cran 12.` }),
+    d({ id: 'midi', name: 'Coup de midi', archetype: 'rare', rarity: 'rare', glyph: 'star', couple: [3, 3], v: [25, 35], fixed: true, text: (v) => `Fixe : ne tourne pas. ${v} dégâts, seulement au cran 12.` }),
     d({ id: 'rouille', name: 'Rouille', archetype: 'rare', rarity: 'rare', glyph: 'rust', couple: [2, 2], v: [1, 2], text: (v) => `L’automate perd ${v} PV à chaque cran restant de ce tour.` }),
   ].map((c) => [c.id, c]),
 );

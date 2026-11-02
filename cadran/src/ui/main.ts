@@ -2,7 +2,7 @@
 import './style.css';
 import { Sound } from '../../../src/audio';
 import { ARCHETYPE_NAME, CARDS, coupleOf, def, textOf } from '../engine/cards';
-import { canMove, canPlace, canRemove, cardBadge, coupleUsed, intentsFor, minuitMult, minuitTour, move, MOVE_COST, place, previewTour, remove, resolveTour } from '../engine/combat';
+import { canMove, canPlace, canRemove, cardBadge, coupleUsed, intentsFor, minuitMult, minuitTour, move, MOVE_COST, place, previewTour, remove, resolveTour, rotatedDial, ROTATION } from '../engine/combat';
 import { ENEMIES, tunedHp } from '../engine/enemies';
 import { RELICS } from '../engine/relics';
 import { buyCard, buyRelic, chooseNode, COST, finishCombat, HEURES, leaveAtelier, newRun, removeCard, repair, takeReward, temperCard, type RunState } from '../engine/run';
@@ -35,6 +35,8 @@ let undo: CombatState[] = [];
 let peek = 0; // 0 = tour courant, 1 = tour suivant, 2 = dans 2 tours (Verre de montre)
 let anim: Anim | null = null;
 let overlay: Overlay = null;
+let spin = 0; // crans dont le cadran vient de tourner (animation au rembobinage)
+let restFloats = ''; // bilan affiché après un tour
 let settings = { speed: 1, sound: true };
 
 function store<T>(key: string, value?: T): T | null {
@@ -102,7 +104,8 @@ const RULES = `
   <p><b>Le cadran.</b> 12 crans. L’anneau extérieur montre ce que l’automate fera à chaque cran ; l’anneau intérieur porte tes cartes.</p>
   <p><b>Un tour.</b> Tu pioches 4 cartes et tu as <b>3 de Remontage</b>. Poser une carte coûte son poids (les losanges), déplacer une carte posée coûte 1, la retirer est gratuit.</p>
   <p><b>Le cadran tourne.</b> À chaque cran : ta défense, puis l’automate, puis ton attaque. Les chiffres au centre du cadran sont la prévision exacte du tour.</p>
-  <p><b>Le temps se rembobine.</b> Tes cartes restent posées et rejouent à chaque tour. La machine grandit d’une pièce par tour.</p>
+  <p><b>Le temps se rembobine.</b> Tes cartes restent posées et rejouent à chaque tour : ta machine grandit.</p>
+  <p><b>Le cadran tourne.</b> À chaque rembobinage, toutes tes cartes avancent d’un cran dans le sens des aiguilles d’une montre. Les intentions de l’automate, elles, ne tournent pas. Le bouton « Tour suivant » montre où seront tes cartes.</p>
   <p><b>Couple.</b> Le cadran supporte au plus 10 de poids. Pour poser une grosse pièce, retire-en une vieille.</p>
   <p><b>Minuit.</b> Au 6e tour, l’automate double ses dégâts, puis encore à chaque tour. Ne traîne pas.</p>`;
 
@@ -202,7 +205,7 @@ function combatScreen(r: RunState): string {
   if (!anim && sel?.kind === 'slot') for (let c = 0; c < 12; c++) if (canMove(s, sel.c, c)) targets.add(c);
 
   const dial = renderDial({
-    dial: view.dial,
+    dial: !anim && peek ? rotatedDial(s.dial, ROTATION * peek) : view.dial,
     intents,
     annulled,
     moved,
@@ -218,12 +221,13 @@ function combatScreen(r: RunState): string {
     badge: (c) => cardBadge(view, c),
     hand: step ? step.cran + 1 : 0,
     erased: anim?.erased ?? new Set(),
+    spin: anim || peek ? 0 : spin,
   });
 
   // Ligne de prévision
   let fore: string;
   if (anim) fore = `<span>Le cadran tourne…</span><button type="button" class="toggle" data-act="skip">Passer</button>`;
-  else if (peek > 0) fore = `<span>Intentions du tour ${tourShown} (aperçu)</span>${peekBtn(s)}`;
+  else if (peek > 0) fore = `<span>Tour ${tourShown} : ses intentions, et tes cartes après ${peek} cran${peek > 1 ? 's' : ''} de rotation</span>${peekBtn(s)}`;
   else fore = `<span>Prévu : tu infliges <strong>${log!.dealt}</strong> · tu subis <strong class="${log!.taken ? 'bad' : ''}">${log!.taken}</strong>${log!.outcome === 'win' ? ' · <strong>victoire</strong>' : log!.outcome === 'lose' ? ' · <strong class="bad">défaite</strong>' : ''}</span>${peekBtn(s)}`;
 
   // Ligne de détail
@@ -243,10 +247,12 @@ function combatScreen(r: RunState): string {
     const c = s.dial[sel.c]!;
     detail = `<span class="grow"><strong>${def(c).name}${c.tempered ? '+' : ''}</strong> · cran ${sel.c + 1} · ${textOf(c)}${c.id === 'ressort' ? ` Tension : ${c.tension}.` : ''} ${s.energy >= MOVE_COST ? 'Touche un cran libre pour la déplacer (1 de Remontage).' : ''}</span>${canRemove(s, sel.c) ? '<button type="button" class="toggle" data-act="remove">Retirer</button>' : ''}`;
   } else {
-    const firstFight = r.heure === 1 && s.tour <= 2;
-    const tip = firstFight
+    const firstFight = r.heure === 1 && s.tour <= 3;
+    const tip = firstFight && s.tour === 1
       ? 'Les pastilles rouges sont ses coups. Une Parade posée sur le même cran l’annule et la renvoie.'
-      : 'Pose autant de cartes que ton Remontage le permet. Touche une carte posée pour la déplacer ou la retirer.';
+      : firstFight
+        ? 'Le cadran a tourné : à chaque rembobinage, tes cartes avancent d’un cran. « Tour suivant » montre où elles seront.'
+        : 'Pose autant de cartes que ton Remontage le permet. Touche une carte posée pour la déplacer ou la retirer.';
     const canStill = s.hand.some((c) => s.energy >= coupleOf(c)) || s.energy >= MOVE_COST;
     detail = `<span class="grow">${canStill ? tip : 'Remontage épuisé : lance le cadran.'}</span>`;
   }
@@ -254,7 +260,7 @@ function combatScreen(r: RunState): string {
   const hand = (anim ? anim.pre.hand : s.hand)
     .map((c, i) => cardHtml(c, { selected: sel?.kind === 'hand' && sel.i === i, cant: !anim && (s.energy < coupleOf(c) || coupleUsed(s) + coupleOf(c) > s.coupleMax), act: anim ? undefined : 'hand', arg: i }))
     .join('');
-  const pad = Array.from({ length: Math.max(0, 3 - (anim ? anim.pre.hand.length : s.hand.length)) }, () => cardHtml('frappe', { ghost: true })).join('');
+  const pad = Array.from({ length: Math.max(0, 4 - (anim ? anim.pre.hand.length : s.hand.length)) }, () => cardHtml('frappe', { ghost: true })).join('');
 
   return `${topBar(r, player.hp)}
   <div class="enemy" id="enemy">
@@ -265,7 +271,7 @@ function combatScreen(r: RunState): string {
       <span class="text">${e.text}</span>
     </div>
   </div>
-  <div class="dial-wrap"><div class="dial-box" id="dialBox">${dial}${anim?.floats ?? ''}</div></div>
+  <div class="dial-wrap"><div class="dial-box" id="dialBox">${dial}${anim ? anim.floats : restFloats}</div></div>
   <div class="forecast">${fore}</div>
   <div class="detail">${detail}</div>
   <div class="hand">${hand}${pad}</div>
@@ -392,6 +398,7 @@ function render(): void {
   else if (run.screen === 'atelier') html = atelierScreen(run);
   else html = endScreen(run);
   app.innerHTML = html + overlayHtml();
+  spin = 0;
 }
 
 // ——— Combat : actions et animation ———
@@ -484,13 +491,21 @@ function tickAnim(): void {
 
 function endAnim(): void {
   window.clearTimeout(animTimer);
+  const done = anim;
   anim = null;
   const s = run?.combat;
   if (s?.outcome) {
     overlay = { kind: 'end' };
     if (s.outcome === 'win') sound.win();
     else sound.fail();
-  } else sound.rewind();
+  } else if (done) {
+    sound.rewind();
+    const extra = 3 * (s!.enemy.phase - done.pre.enemy.phase);
+    spin = ROTATION + extra;
+    const turn = extra ? `le Carillon fait tourner ton cadran de ${spin} crans` : 'le cadran tourne d’un cran';
+    restFloats = `<span class="float summary" style="left:50%;top:50%">${done.log.taken ? `<span class="danger">−${done.log.taken} PV</span>` : 'aucun dégât subi'} · ${done.log.dealt} infligés<small>↻ ${turn}</small></span>`;
+    window.setTimeout(() => (restFloats = ''), 2300);
+  }
   save();
   render();
 }
