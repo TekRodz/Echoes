@@ -9,11 +9,12 @@ import { buyCard, buyRelic, chooseNode, COST, finishCombat, HEURES, leaveAtelier
 import type { CardInst, CombatState, TourLog } from '../engine/types';
 import { cranPercent, renderDial } from './dial';
 import { glyph, ROMAN, sprite } from './icons';
+import { linkTerms, TERMS } from './lexicon';
 
 // ——— État de l'interface ———
 
 type Sel = { kind: 'hand'; i: number } | { kind: 'slot'; c: number } | null;
-type Overlay = null | { kind: 'deck'; mode: 'view' | 'remove' | 'temper' } | { kind: 'rules' } | { kind: 'menu'; confirm?: boolean } | { kind: 'end' };
+type Overlay = null | { kind: 'deck'; mode: 'view' | 'remove' | 'temper' } | { kind: 'rules' } | { kind: 'lexicon'; focus?: string } | { kind: 'menu'; confirm?: boolean } | { kind: 'end' };
 
 interface Anim {
   pre: CombatState;
@@ -123,6 +124,7 @@ function titleScreen(): string {
       <button type="button" class="${canResume() ? 'secondary' : 'primary'}" data-act="new">Nouvelle run</button>
       <button type="button" class="secondary" data-act="daily">Cadran du jour</button>
       <button type="button" class="secondary" data-act="rules">Comment jouer</button>
+      <button type="button" class="secondary" data-act="lexicon">Lexique</button>
     </div>
     <p class="kicker" style="margin-top:auto">L’Horlogère · 25 cartes · 6 Heures · 8 rouages</p>
   </div>`;
@@ -227,7 +229,7 @@ function combatScreen(r: RunState): string {
   // Ligne de prévision
   let fore: string;
   if (anim) fore = `<span>Le cadran tourne…</span><button type="button" class="toggle" data-act="skip">Passer</button>`;
-  else if (peek > 0) fore = `<span>Tour ${tourShown} : ses intentions, et tes cartes après ${peek} cran${peek > 1 ? 's' : ''} de rotation</span>${peekBtn(s)}`;
+  else if (peek > 0) fore = `<span></span>${peekBtn(s)}`;
   else fore = `<span>Prévu : tu infliges <strong>${log!.dealt}</strong> · tu subis <strong class="${log!.taken ? 'bad' : ''}">${log!.taken}</strong>${log!.outcome === 'win' ? ' · <strong>victoire</strong>' : log!.outcome === 'lose' ? ' · <strong class="bad">défaite</strong>' : ''}</span>${peekBtn(s)}`;
 
   // Ligne de détail
@@ -241,11 +243,13 @@ function combatScreen(r: RunState): string {
       ? `<span class="danger">Il faut ${coupleOf(c)} de Remontage, il t’en reste ${s.energy}.</span>`
       : !fits
         ? '<span class="danger">Couple du cadran dépassé : retire d’abord une carte (gratuit).</span>'
-        : `coûte ${coupleOf(c)} de Remontage. Touche un cran libre pour la poser.`;
-    detail = `<span class="grow"><strong>${def(c).name}</strong> · ${msg}</span>`;
+        : coupleOf(c)
+          ? `Coût ${coupleOf(c)}. Touche un cran libre.`
+          : 'Gratuite. Touche un cran libre.';
+    detail = `<span class="grow"><strong>${def(c).name}${c.tempered ? '+' : ''}</strong> · ${linkTerms(textOf(c))} ${msg}</span>`;
   } else if (sel?.kind === 'slot') {
     const c = s.dial[sel.c]!;
-    detail = `<span class="grow"><strong>${def(c).name}${c.tempered ? '+' : ''}</strong> · cran ${sel.c + 1} · ${textOf(c)}${c.id === 'ressort' ? ` Tension : ${c.tension}.` : ''} ${s.energy >= MOVE_COST ? 'Touche un cran libre pour la déplacer (1 de Remontage).' : ''}</span>${canRemove(s, sel.c) ? '<button type="button" class="toggle" data-act="remove">Retirer</button>' : ''}`;
+    detail = `<span class="grow"><strong>${def(c).name}${c.tempered ? '+' : ''}</strong> · cran ${sel.c + 1} · ${linkTerms(textOf(c))}${c.id === 'ressort' ? ` ${linkTerms('Tension')} : ${c.tension}.` : ''} ${s.energy >= MOVE_COST ? 'Touche un cran libre pour la déplacer (1 de Remontage).' : ''}</span>${canRemove(s, sel.c) ? '<button type="button" class="toggle" data-act="remove">Retirer</button>' : ''}`;
   } else {
     const firstFight = r.heure === 1 && s.tour <= 3;
     const tip = firstFight && s.tour === 1
@@ -268,7 +272,7 @@ function combatScreen(r: RunState): string {
     <div class="who">
       <span class="name">${e.name}<small>${e.tier === 'boss' ? `Boss · phase ${s.enemy.phase + 1}/3` : e.tier === 'elite' ? 'Élite' : 'Automate'}</small></span>
       <span class="row">${hpBar(enemy.hp, enemy.maxHp, true)} ${enemy.hp}/${enemy.maxHp}${enemy.block ? ` <span class="shieldv">${glyph('block', 13, '#1f1a14')} ${enemy.block}</span>` : ''}</span>
-      <span class="text">${e.text}</span>
+      <span class="text">${linkTerms(e.text)}</span>
     </div>
   </div>
   <div class="dial-wrap"><div class="dial-box" id="dialBox">${dial}${anim ? anim.floats : restFloats}</div></div>
@@ -351,13 +355,19 @@ function endScreen(r: RunState): string {
 
 function overlayHtml(): string {
   if (!overlay) return '';
-  if (overlay.kind === 'rules') return `<div class="overlay" data-act="close"><div class="panel" data-stop><h2>Comment jouer</h2><div class="rules">${RULES}</div><button type="button" class="primary" data-act="close">Compris</button></div></div>`;
+  if (overlay.kind === 'rules') return `<div class="overlay" data-act="close"><div class="panel" data-stop><h2>Comment jouer</h2><div class="rules">${RULES}</div><div class="row-btns"><button type="button" class="secondary" data-act="lexicon">Lexique</button><button type="button" class="primary" data-act="close">Compris</button></div></div></div>`;
+  if (overlay.kind === 'lexicon') {
+    const focus = overlay.focus;
+    const items = TERMS.map((t) => `<div class="lex${t.id === focus ? ' focus' : ''}" id="term-${t.id}"><b>${t.name}</b><p>${t.text}</p></div>`).join('');
+    return `<div class="overlay" data-act="close"><div class="panel" data-stop><h2>Lexique</h2><div class="lexicon">${items}</div><button type="button" class="primary" data-act="close">Fermer</button></div></div>`;
+  }
   if (overlay.kind === 'menu') {
     return `<div class="overlay" data-act="close"><div class="panel" data-stop>
       <h2>Pause</h2>
       <div class="service"><span><b>Vitesse du cadran</b></span><button type="button" class="toggle" data-act="speed">×${settings.speed}</button></div>
       <div class="service"><span><b>Son</b></span><button type="button" class="toggle" data-act="sound">${settings.sound ? 'Oui' : 'Non'}</button></div>
       <button type="button" class="secondary" data-act="rules">Comment jouer</button>
+      <button type="button" class="secondary" data-act="lexicon">Lexique</button>
       <button type="button" class="secondary danger" data-act="abandon">${overlay.confirm ? 'Confirmer l’abandon' : 'Abandonner la run'}</button>
       <button type="button" class="primary" data-act="close">Reprendre</button>
     </div></div>`;
@@ -399,6 +409,7 @@ function render(): void {
   else html = endScreen(run);
   app.innerHTML = html + overlayHtml();
   spin = 0;
+  if (overlay?.kind === 'lexicon' && overlay.focus) document.getElementById(`term-${overlay.focus}`)?.scrollIntoView({ block: 'center' });
 }
 
 // ——— Combat : actions et animation ———
@@ -548,6 +559,12 @@ app.addEventListener('click', (ev) => {
       break;
     case 'rules':
       overlay = { kind: 'rules' };
+      break;
+    case 'lexicon':
+      overlay = { kind: 'lexicon' };
+      break;
+    case 'term':
+      overlay = { kind: 'lexicon', focus: arg };
       break;
     case 'menu':
       overlay = { kind: 'menu' };

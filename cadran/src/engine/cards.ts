@@ -32,8 +32,8 @@ export const CARDS: Record<string, CardDef> = Object.fromEntries(
     // Précision
     d({ id: 'parade', name: 'Parade', archetype: 'precision', rarity: 'commune', glyph: 'parry', couple: [1, 1], v: [50, 100], text: (v) => `Annule une attaque sur ce cran et en renvoie ${v} %.` }),
     d({ id: 'contretemps', name: 'Contretemps', archetype: 'precision', rarity: 'peu commune', glyph: 'hit', couple: [2, 2], v: [12, 16], text: (v) => `${v} dégâts, seulement si l’automate agit sur ce cran.` }),
-    d({ id: 'retard', name: 'Retard', archetype: 'precision', rarity: 'commune', glyph: 'later', couple: [1, 0], v: [1, 1], text: () => 'Décale l’intention du cran suivant d’un cran plus loin.' }),
-    d({ id: 'avance', name: 'Avance', archetype: 'precision', rarity: 'commune', glyph: 'sooner', couple: [1, 0], v: [1, 1], text: () => 'L’intention située 2 crans plus loin avance d’un cran.' }),
+    d({ id: 'retard', name: 'Retard', archetype: 'precision', rarity: 'commune', glyph: 'later', couple: [0, 0], v: [0, 3], text: (v) => `Gratuite. Décale l’intention du cran suivant d’un cran plus loin.${v ? ` ${v} dégâts.` : ''}` }),
+    d({ id: 'avance', name: 'Avance', archetype: 'precision', rarity: 'commune', glyph: 'sooner', couple: [0, 0], v: [0, 3], text: (v) => `Gratuite. L’intention située 2 crans plus loin avance d’un cran.${v ? ` ${v} dégâts.` : ''}` }),
     d({ id: 'grippage', name: 'Grippage', archetype: 'precision', rarity: 'peu commune', glyph: 'jam', couple: [2, 1], v: [1, 1], text: () => 'Annule la prochaine intention de l’automate (ce cran compris).' }),
     d({ id: 'riposte', name: 'Riposte', archetype: 'precision', rarity: 'commune', glyph: 'hit', couple: [1, 1], v: [3, 4], w: [6, 9], text: (v, w) => `${v} dégâts, +${w} si tu as paré pendant ce tour.` }),
     d({ id: 'lecture', name: 'Lecture', archetype: 'precision', rarity: 'commune', glyph: 'read', couple: [1, 1], v: [3, 5], text: (v) => `${v} dégâts. Pioche une carte de plus au prochain rembobinage.` }),

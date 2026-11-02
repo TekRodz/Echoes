@@ -280,6 +280,10 @@ export function resolveTour(s: CombatState): TourLog {
     const v = vOf(card);
     const w = wOf(card);
     switch (card.id) {
+      case 'retard':
+      case 'avance':
+        if (v > 0) hit(c, card, val(c, v, factor));
+        break;
       case 'frappe':
         hit(c, card, val(c, v, factor));
         break;
@@ -482,7 +486,8 @@ export function cardBadge(s: CombatState, c: CardInst): string {
     return String(vOf(c) * t);
   }
   if (c.id === 'spirale') return String(vOf(c) * 2 ** Math.min(6, Math.max(0, c.turns)));
-  if (['retard', 'avance', 'grippage', 'double'].includes(c.id)) return '';
+  if (c.id === 'retard' || c.id === 'avance') return vOf(c) ? String(vOf(c)) : '';
+  if (['grippage', 'double'].includes(c.id)) return '';
   if (c.id === 'parade') return `${vOf(c)}%`;
   if (c.id === 'elan') return `+${vOf(c)}`;
   if (c.id === 'chaine') return `${vOf(c)}%`;
