@@ -7,9 +7,13 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run && vitest run --config cadran/vite.config.ts",
     "typecheck": "tsc --noEmit",
-    "build:artifact": "npm run build && node scripts/build-artifact.mjs"
+    "build:artifact": "npm run build && node scripts/build-artifact.mjs",
+    "cadran:dev": "vite --config cadran/vite.config.ts",
+    "cadran:build": "tsc --noEmit && vite build --config cadran/vite.config.ts",
+    "cadran:test": "vitest run --config cadran/vite.config.ts",
+    "cadran:artifact": "npm run cadran:build && node scripts/build-artifact.mjs dist-cadran cadran.html Cadran"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
